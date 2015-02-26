@@ -1,0 +1,15 @@
+
+<h1>Quiz reply page</h1>
+
+<p>Hello {{user.username}}!</p>
+
+<p>This is a page for quiz that was created on: {{quiz.quiz_date}}</p>
+
+<p>Please respond to these questions</p>
+      
+<form method="POST" action="{{ url_for('quiz_reply_page', quiz_id=quiz.id, secure_user_id=secure_user_id) }}">
+    <div>{{ reply_form.reply_text.label }}: {{ reply_form.reply_text() }}</div>
+    <div>{{ reply_form.reply_mark.label }}: {{ reply_form.reply_mark() }}</div>
+    <input type="submit" value="Reply">
+</form>
+
