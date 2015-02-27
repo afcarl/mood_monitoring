@@ -10,6 +10,7 @@ from flask_bootstrap import Bootstrap
 from flask import request
 from flask.ext.mail import Mail
 from flask.ext.mail import Message
+from threading import Thread
 
 app = flask.Flask(__name__)
 
@@ -80,37 +81,62 @@ class Reply(db.Model):
 MAIL_TEMPLATE = "Hello, {user_name}. Please, leave your reply to the following quiz via link {link}."
 
 def get_secure_reply_url(quiz_model, user_model):
-    quiz_id = quiz_model.id
-    user_id = user_model.id
+    quiz_id = quiz_model['id']
+    user_id = user_model['id']
     secret_key = app.config['SECRET_KEY']
     serializer = URLSafeSerializer(secret_key)
     secure_user_id = serializer.dumps(user_id)
     return flask.url_for('quiz_reply_page', quiz_id=quiz_id, secure_user_id=secure_user_id, _external=True)
 
-def send_emails_to_all_users(form, quiz_model, is_created):
-    
-    if not is_created:
-        return
+def send_emails_to_all_users(quiz_model, users):
     
     template = "Hello, {username}"
     
-    quiz_question = quiz_model.quiz_question
-    users = User.query.all()
+    print users
+    
+    print quiz_model
+    
+    quiz_question = quiz_model['quiz_question']
     
     with mail.connect() as conn:
         for user in users:
-            user_reply_secure_url = get_secure_reply_url(quiz_model, user)
-            body = MAIL_TEMPLATE.format(user_name=user.username, link=user_reply_secure_url)
+            #user_reply_secure_url = get_secure_reply_url(quiz_model, user)
+            user_reply_secure_url = 'bla'
+            body = MAIL_TEMPLATE.format(user_name=user['username'], link=user_reply_secure_url)
             msg = Message(sender="cargodummy@gmail.com",
-                            recipients=[user.email],
+                            recipients=[user['email']],
                             body=body,
                             subject=("Vibometer quiz: " + quiz_question))
             conn.send(msg)
 
+def send_emails_to_all_users_async(app, quiz_model, users):
+    with app.app_context():
+        send_emails_to_all_users(quiz_model, users)
+
+
+def after_quiz_model_change_hook(form, quiz_model, is_created):
+    
+    if not is_created:
+        return
+    
+    users = User.query.all()
+    
+    print quiz_model.quiz_question
+    
+    for index, user in enumerate(users):
+        users[index] = user.__dict__
+    
+    quiz_model = quiz_model.__dict__
+    
+    print quiz_model
+    
+    thr = Thread(target=send_emails_to_all_users_async, args=[app, quiz_model, users])
+    thr.start()
+
 Reply_form = model_form(Reply, Form)
 
 Quiz_model_controller = ModelView(Quiz, db.session)
-Quiz_model_controller.after_model_change = send_emails_to_all_users
+Quiz_model_controller.after_model_change = after_quiz_model_change_hook
 
 
 admin.add_view(ModelView(User, db.session))
